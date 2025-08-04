@@ -1,15 +1,27 @@
 # 🚀 CUDA AI Inference Acceleration: Batched MatMul (PyTorch vs. Custom CUDA Kernel)
 
-This project demonstrates how to implement and benchmark high-efficiency batched matrix multiplication on GPU using both **PyTorch (official GPU API)** and a **custom CUDA batched matmul kernel** (via Cupy dynamic loading). It provides a clear, practical baseline for AI/GPU optimization and infrastructure interviews or technical portfolio.
+This project demonstrates how to implement and benchmark high-performance batched matrix multiplication on GPU using both **PyTorch’s official GPU API** and a **custom CUDA batched matmul kernel** (via Cupy dynamic loading).  
+It provides a clear, practical baseline for AI/GPU optimization—ideal for interviews, technical portfolios, or anyone learning GPU infrastructure and profiling.
+
+**A true highlight of this project is its in-depth GPU profiling: every kernel is timeline-annotated and analyzed with NVIDIA Nsight, providing clear visual insights into real-world performance bottlenecks.**
 
 ---
 
+
 ## 🌟 Key Features
 
-* **PyTorch Baseline**: Uses PyTorch's batched GPU matmul as an industry-standard reference.
-* **Custom CUDA Kernel**: Implements a hand-crafted CUDA batched matmul kernel, called from Python via Cupy for direct performance comparison.
-* **Unified Benchmark**: Benchmark script runs both PyTorch and custom CUDA kernel for direct latency comparison.
-* **Extensible Structure**: Easily extendable for ONNX, TensorRT, OpenMP, profiling, or advanced topics.
+- **Industry Baseline (PyTorch cuBLAS):**  
+  Benchmarks with PyTorch’s batched GPU matmul as an industry-standard reference (cuBLAS backend).
+
+- **Custom CUDA Kernel (via Cupy):**  
+  Hand-crafted batched matmul kernel, dynamically loaded and executed from Python for fair head-to-head performance analysis.
+
+- **Unified Benchmark & Profiling:**  
+  One-click script runs both PyTorch and custom CUDA kernel, outputs side-by-side latency—
+  **with code-level NVTX annotations and full NVIDIA Nsight timeline profiling**.
+
+- **Extensible Engineering Structure:**  
+  Designed for easy extension—add ONNX, TensorRT, OpenMP, or further profiling modules for advanced AI system and hardware benchmarking.
 
 ---
 
@@ -20,40 +32,40 @@ cuda-ai-inference-acceleration/
 ├── cuda_kernel/
 │   ├── batched_matmul.cu         # CUDA kernel
 │   ├── batched_matmul.py         # Python interface for CUDA kernel
-│   ├── build.sh                  # (optional) build script
 ├── pytorch_baseline/
 │   └── run_pytorch.py            # PyTorch baseline
 ├── benchmark/
-│   └── run_all.py                # Unified benchmark
+│   └── run_all.py                # Unified benchmark & runner
+├── images/
+│   ├── pytorch_matmul.PNG        # Nsight profiler: PyTorch timeline screenshot
+│   ├── CUDA_kernel_matmul.PNG    # Nsight profiler: custom CUDA kernel timeline screenshot
 ├── README.md
 └── requirements.txt
 ```
+
+> * **images/**: All key profiler timeline screenshots for analysis & reporting.
+
+
 
 ---
 
 ## 🧑‍💻 Main Components
 
-### 1. **PyTorch Baseline**
+### 1. **PyTorch Baseline (`pytorch_baseline/run_pytorch.py`)**
 
-`pytorch_baseline/run_pytorch.py`
+> Runs batched matrix multiplication on GPU using PyTorch (cuBLAS backend), serving as the industry-standard reference for performance and profiling.  
+> Includes NVTX annotation for timeline analysis.
 
-> Batched matmul on GPU using PyTorch, serving as the industry baseline.
+### 2. **Custom CUDA Kernel (`cuda_kernel/batched_matmul.cu`, `batched_matmul.py`)**
 
-### 2. **Custom CUDA Kernel (Cupy)**
+> Implements a pure CUDA batched matmul kernel with batch-parallel execution, designed for direct comparison against cuBLAS.  
+> Loaded and launched from Python via `cupy.RawModule` for seamless integration and profiling.  
+> Includes per-iteration NVTX annotation to highlight kernel performance in the profiler timeline.
 
-`cuda_kernel/batched_matmul.cu`
+### 3. **Unified Benchmark Script (`benchmark/run_all.py`)**
 
-> Pure CUDA batched matmul kernel, batch dimension parallelization.
-
-`cuda_kernel/batched_matmul.py`
-
-> Loads and calls CUDA kernel via cupy.RawModule, measures execution time in Python.
-
-### 3. **Benchmark Script**
-
-`benchmark/run_all.py`
-
-> Runs both PyTorch and custom CUDA kernel, prints latency results for comparison.
+> Runs both PyTorch and custom CUDA kernel benchmarks with a single command.  
+> Prints side-by-side latency results, and ensures profiler-friendly workflow for timeline visualization and bottleneck analysis.
 
 ---
 
@@ -63,40 +75,122 @@ cuda-ai-inference-acceleration/
 
 ```bash
 pip install -r requirements.txt
-# (Requires NVIDIA GPU drivers & CUDA toolkit installed)
+# Requires: NVIDIA GPU drivers and CUDA toolkit (tested with CUDA 11+)
 ```
 
-### 2️⃣ Run benchmarks
+### 2️⃣ Run all benchmarks (with profiler-ready workflow)
 
 ```bash
 python benchmark/run_all.py
 ```
 
-Runs both the PyTorch and custom CUDA kernel batched matmul, outputs average per-batch latency (ms).
+* This runs both the PyTorch and custom CUDA kernel batched matmul benchmarks, outputs average per-batch latency (ms), and supports profiler (Nsight Systems/Compute) integration out of the box.
+* For GPU timeline profiling, simply launch this script under Nsight profiler; all NVTX annotations will appear in the timeline.
+
+
+---
+
+## 🧪 Experimental Results & Profiling Analysis
+
+### 1. Quantitative Benchmark Results
+
+- **PyTorch baseline (cuBLAS):** `0.080 ms per batch`
+- **Custom CUDA kernel:** `0.379 ms per batch`
+- (Each average of 50 rounds, batch=128, matrix size=64x64)
+
+The PyTorch baseline is significantly faster than the custom kernel, with about a 4.7x performance gap.
+
+---
+
+### 2. Timeline Profiling & Bottleneck Analysis
+
+To better understand the performance gap, I inserted clear markers at each matmul round using `nvtx.annotate`, and profiled the GPU timeline using Nsight Systems. All screenshots are stored in `/images`.
+
+#### 📷 cuBLAS (PyTorch) Timeline
+![PyTorch Timeline](images/pytorch_matmul.PNG)
+> Built-in PyTorch batched matmul is annotated in green. Each kernel (`maxwell_sgemm_128x64_nn`) takes only ~5μs, with tightly packed kernel launches and high SM utilization. There is minimal delay, and the cudaDeviceSynchronize region is extremely short.
+
+#### 📷 Custom CUDA Kernel Timeline
+![CUDA Kernel Timeline](images/CUDA_kernel_matmul.PNG)
+> Each custom kernel call is marked in red, with a single kernel taking only about 3-4μs—not slow by itself, but the cudaDeviceSynchronize region is much longer, indicating that the kernel itself is not the main bottleneck.
+
+---
+
+### 3. Analysis & Technical Insights
+
+**Key observations:**
+- PyTorch baseline is much faster, but the timeline reveals that the per-kernel time is actually not so different.
+- Therefore, I took a closer look at the cudaDeviceSynchronize section, which is where the host waits for all GPU work to finish.
+
+**Root cause:**
+- The cuBLAS matmul kernel and memory pipeline are highly optimized, with streamlined kernel launches and memory ops.
+- Although the custom kernel is also fast per call, each round involves cupy dynamic memory allocation/freeing and kernel launch overhead (e.g., repeated cudaMemsetAsync, cudaFree in the timeline).
+- These memory and launch overheads accumulate at every cudaDeviceSynchronize, resulting in a much higher overall runtime as measured by time.time().
+
+**Conclusion:**
+- The custom kernel's performance bottleneck is not the computation itself, but system-level overhead from kernel launch, memory pipeline, and synchronization.
+- This is why industry-standard practice is to use cuBLAS (PyTorch backend): it delivers highly optimized kernels, memory management, and execution flow.
+
+---
+
+### 4. Annotate Markers vs. time.time(): What’s the Difference?
+
+* I inserted `nvtx.annotate()` inside the for loop for each matmul round, so the timeline can precisely align each kernel, cuda API, memory op, and synchronization event.
+* However, `time.time()` is measured around the **entire** for loop, including all kernel launches, memory ops, and a final synchronize call—so the measured duration is much longer and includes all GPU-side waiting time.
+* The annotated region in the timeline covers only a single matmul kernel, not the total CUDA pipeline wait.
+
+#### Timing and Annotation Example
+
+```python
+t0 = time.time()
+for _ in range(50):
+    with nvtx.annotate("Pytorch matmul", color="green"):
+        out = pytorch_batched_matmul(a, b)
+torch.cuda.synchronize()
+t1 = time.time()
+print(f"PyTorch batched matmul: {(t1 - t0) * 1000 / 50:.3f} ms per batch")
+```
+
+* Here, `time.time()` measures the total duration including all kernel launches and the synchronization wait at the end, so the measured latency per batch includes all accumulated GPU delays—not just the kernel compute time itself.
+* By contrast, the NVTX annotations inside the loop make each kernel invocation visible as a separate region in the timeline, enabling precise kernel-level performance analysis.
+
+---
+
+### 5. Project Insights
+
+- This project demonstrates the full workflow for AI/GPU performance benchmarking: comparing PyTorch cuBLAS, a custom CUDA kernel, and analyzing real profiler data with clear, interpretable visualizations.
+- This approach is essential for any AI infra/ML systems engineer: quantifying, profiling, and clearly communicating the source of performance gaps, both in numbers and with visual evidence.
+
 
 ---
 
 ## 📌 Technical Highlights
 
-* **PyTorch/Deep Learning Engineering**: Shows proficiency with PyTorch GPU tensor operations.
-* **CUDA Kernel Programming**: Demonstrates low-level kernel design for batched matmul, including memory layout, grid/block/thread setup.
-* **Cupy Integration**: Seamlessly connects Python to CUDA with dynamic compilation, no pybind11 or manual C++ compilation needed.
-* **Performance Profiling**: Unified script for direct comparison, a must-have for AI/infra teams.
+* **PyTorch / Deep Learning Engineering:** Demonstrates practical skills in PyTorch GPU tensor operations and industry-standard matmul workflows.
+* **CUDA Kernel Programming:** Implements custom batched matrix multiplication, showcasing low-level GPU design: memory layout, grid/block/thread planning, and kernel launch strategy.
+* **Cupy Integration:** Seamlessly bridges Python and CUDA, using dynamic compilation (no pybind11/manual C++ required) for easy kernel prototyping and extension.
+* **End-to-End Profiling:** Unified, profiler-ready benchmark pipeline (with NVTX and Nsight), enabling actionable performance comparison—essential for AI/infra teams and interview preparation.
 
 ---
 
 ## 🔥 Extension Ideas
 
-* Add kernel profiling (nvprof, nsight, torch profiler) to visualize execution time and memory usage.
-* Extend to support half precision (FP16), larger batch/matrix sizes.
-* Add OpenMP-based CPU version for full CPU vs. GPU comparison.
-* Integrate ONNX/TensorRT in the same benchmarking framework for end-to-end inference acceleration comparison.
+- **HIP Porting:** Extend the custom CUDA kernel to HIP for AMD GPU compatibility; benchmark and profile on ROCm to compare NVIDIA vs. AMD hardware efficiency.
+- **Multi-GPU Scaling:** Add support for multi-GPU batch parallelism and distributed execution, to study scale-up and scale-out performance (NCCL, ROCm RCCL).
+- **FP16 & Mixed Precision:** Support half precision (FP16) and mixed precision inference/training for both CUDA and HIP backends.
+- **Framework Integration:** Integrate with Triton, CUTLASS, or Compute Kernel (CK) for portable, high-performance batched matmul across CUDA, HIP, and potentially SYCL.
+- **Deep Learning Framework Hooks:** Add plugins for direct PyTorch/TensorFlow extension (e.g., custom ops or PyTorch C++/CUDA/HIP extension) to enable transparent benchmarking in real models.
+- **Compiler Optimization:** Experiment with compiler flags and graph compilers (LLVM, ROCm, TVM) for further kernel and system performance gains.
+- **OpenMP/CPU Backend:** Implement OpenMP-based CPU version for full CPU vs. GPU (NVIDIA/AMD) comparison.
+- **ONNX/TensorRT/ROCm-inference:** Integrate ONNX Runtime, TensorRT, and ROCm MIOpen for a complete end-to-end inference acceleration benchmark on all major platforms.
+
+> *These extensions make the project a real-world testbed for AI system engineers, and are directly aligned with the requirements of modern GPU kernel roles at companies like AMD, NVIDIA, and beyond.*
 
 ---
 
 ## 📣 Why This Project?
 
-This project was built completely from scratch to demonstrate the full workflow required for AI engineering/infra teams: from using high-level GPU frameworks (PyTorch) to hand-optimized CUDA kernels, plus real benchmark and profiling analysis. It proves capability in both software stack integration and low-level optimization, perfect for interviews at NVIDIA, Qualcomm, AWS, or similar AI/GPU teams.
+Built from scratch, this project demonstrates the **full workflow needed for modern AI engineering and infrastructure roles**: from high-level PyTorch development, to custom CUDA kernel optimization, to real-world benchmarking and timeline-based profiling. It proves ability in both software stack integration and low-level bottleneck analysis—making it valuable for real-world AI infrastructure, research, and advanced GPU system development.
 
 ---
 
@@ -111,3 +205,4 @@ Wang Chen Han
 ## License
 
 MIT License
+
