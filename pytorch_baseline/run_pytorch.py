@@ -1,7 +1,7 @@
 # pytorch_baseline/run_pytorch.py
 import torch
 import time
-
+import nvtx
 def pytorch_batched_matmul(a, b):
     return torch.matmul(a, b)
 
@@ -14,11 +14,13 @@ if __name__ == "__main__":
     # Warmup
     for _ in range(10):
         pytorch_batched_matmul(a, b)
-
     torch.cuda.synchronize()
+
+    
     t0 = time.time()
     for _ in range(50):
-        out = pytorch_batched_matmul(a, b)
+        with nvtx.annotate("Pytorch matmul", color="green"):
+            out = pytorch_batched_matmul(a, b)
     torch.cuda.synchronize()
     t1 = time.time()
     print(f"PyTorch batched matmul: {(t1 - t0) * 1000 / 50:.3f} ms per batch")

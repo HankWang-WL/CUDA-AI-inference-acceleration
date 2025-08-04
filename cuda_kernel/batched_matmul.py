@@ -1,10 +1,15 @@
 # cuda_kernel/batched_matmul.py
 import cupy as cp
 import time
+import nvtx
+import os
 
-# 讀取 cu code
-with open("cuda_kernel/batched_matmul.cu", "r") as f:
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+cu_path = os.path.join(THIS_DIR, "batched_matmul.cu")
+
+with open(cu_path, "r") as f:
     kernel_code = f.read()
+
 
 module = cp.RawModule(code=kernel_code)
 batched_matmul_kernel = module.get_function("batched_matmul_kernel")
@@ -31,10 +36,11 @@ if __name__ == "__main__":
     for _ in range(10):
         batched_matmul_cupy(a, b)
     cp.cuda.Stream.null.synchronize()
-
+    
     t0 = time.time()
     for _ in range(50):
-        c = batched_matmul_cupy(a, b)
+        with nvtx.annotate("CUDA kernel matmul", color="red"):
+            c = batched_matmul_cupy(a, b)
     cp.cuda.Stream.null.synchronize()
     t1 = time.time()
     print(f"CUDA kernel batched matmul: {(t1 - t0) * 1000 / 50:.3f} ms per batch")
