@@ -29,18 +29,33 @@ It provides a clear, practical baseline for AI/GPU optimization—ideal for inte
 
 ```
 cuda-ai-inference-acceleration/
-├── cuda_kernel/
-│   ├── batched_matmul.cu         # CUDA kernel
-│   ├── batched_matmul.py         # Python interface for CUDA kernel
-├── pytorch_baseline/
-│   └── run_pytorch.py            # PyTorch baseline
-├── benchmark/
-│   └── run_all.py                # Unified benchmark & runner
-├── images/
-│   ├── pytorch_matmul.PNG        # Nsight profiler: PyTorch timeline screenshot
-│   ├── CUDA_kernel_matmul.PNG    # Nsight profiler: custom CUDA kernel timeline screenshot
-├── README.md
-└── requirements.txt
+├── benchmark/                       # Benchmark scripts
+│   └── run_all.py                    # One-click benchmark runner (PyTorch / CUDA / HIP)
+│
+├── cuda_kernel/                      # Custom CUDA kernels
+│   ├── batched_matmul.cu              # Original batched matmul kernel
+│   ├── batched_matmul_tiled.cu        # Optimized tiled + shared memory version
+│   └── batched_matmul.py              # Python interface (CuPy kernel invocation)
+│
+├── hip_kernel/                        # HIP kernels (AMD ROCm platform)
+│   ├── batched_matmul_hip.hip         # HIP version of batched matmul kernel
+│   └── run_hip.py                     # HIP test script (runs on ROCm or HIP CUDA backend)
+│
+├── images/                            # Images for README
+│   ├── pytorch_matmul.PNG             # Nsight timeline: PyTorch baseline
+│   ├── CUDA_kernel_matmul.PNG         # Nsight timeline: original CUDA kernel
+│   └── CUDA_kernel_matmul_tiled.PNG   # Nsight timeline: optimized tiled CUDA kernel
+│
+├── nsight_reports/                    # Nsight profiling reports (.nsys-rep)
+│   └── cuBLAS-CUDA-CUDAtiled.nsys-rep # Profiling results for PyTorch, original CUDA, and tiled CUDA
+│
+├── pytorch_baseline/                  # PyTorch baseline implementation
+│   └── run_pytorch.py                 # cuBLAS-based batched matmul baseline
+│
+├── LICENSE                            # License file
+├── README.md                          # Project documentation
+└── requirements.txt                   # Python dependency list
+
 ```
 
 > * **images/**: All key profiler timeline screenshots for analysis & reporting.
@@ -249,6 +264,39 @@ As part of demonstrating **extensibility and cross-platform design**, this proje
 * Demonstrates ability to design a **portable GPU benchmarking framework**.
 * Shows hands-on HIP implementation experience, even without access to the target platform.
 * HIP module is ready for deployment and benchmarking on supported ROCm hardware.
+
+---
+
+## 📌 CUDA vs ROCm: Environment Limitations and Porting Notes
+
+While this project focuses on CUDA acceleration and profiling, an attempt was made to port the custom CUDA kernel to AMD's ROCm/HIP for broader hardware support. On Windows, native ROCm support is unavailable, which prevented successful execution on the development machine. This section documents the key differences and similarities between CUDA and HIP to demonstrate portability considerations.
+
+### Environment Constraints
+
+* **CUDA**: Fully supported on Windows with NVIDIA GPUs; Nsight profiling integrated.
+* **ROCm/HIP**: No official Windows support for ROCm runtime; HIP development primarily targets Linux with AMD GPUs.
+* **Impact**: Kernel compilation for HIP was possible in theory, but runtime execution and profiling required a Linux+AMD environment.
+
+### CUDA ↔ HIP API Mapping Table
+
+| CUDA API / Keyword                           | HIP Equivalent                                                        | Notes                                                                                             |
+| -------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `#include <cuda_runtime.h>`                  | `#include <hip/hip_runtime.h>`                                        | Main runtime API header                                                                           |
+| `cudaMalloc(ptr, size)`                      | `hipMalloc(ptr, size)`                                                | Memory allocation on device                                                                       |
+| `cudaFree(ptr)`                              | `hipFree(ptr)`                                                        | Free device memory                                                                                |
+| `cudaMemcpy(dst, src, size, cudaMemcpyKind)` | `hipMemcpy(dst, src, size, hipMemcpyKind)`                            | Host-device memory copy; kinds map 1:1 (e.g., `cudaMemcpyHostToDevice` → `hipMemcpyHostToDevice`) |
+| `cudaMemset(ptr, val, size)`                 | `hipMemset(ptr, val, size)`                                           | Initialize memory on device                                                                       |
+| `cudaDeviceSynchronize()`                    | `hipDeviceSynchronize()`                                              | Wait for all device operations to finish                                                          |
+| `cudaGetErrorString(err)`                    | `hipGetErrorString(err)`                                              | Convert error code to readable string                                                             |
+| `cudaStream_t`                               | `hipStream_t`                                                         | Stream handle type                                                                                |
+| `cudaStreamCreate(&stream)`                  | `hipStreamCreate(&stream)`                                            | Create a stream                                                                                   |
+| `cudaStreamSynchronize(s)`                   | `hipStreamSynchronize(s)`                                             | Wait for a specific stream                                                                        |
+| `<<<grid, block>>>`                          | `hipLaunchKernelGGL(kernel, grid, block, sharedMem, stream, args...)` | HIP uses a macro for kernel launches instead of triple-angle bracket syntax                       |
+| `__global__` / `__device__` / `__host__`     | Same in HIP                                                           | Kernel and function qualifiers remain identical                                                   |
+
+### Takeaway
+
+The porting process revealed that CUDA-to-HIP translation for this kernel would require minimal code changes thanks to HIP's close API parity. However, the primary blocker was the lack of ROCm runtime support on Windows, making practical execution and profiling on AMD GPUs infeasible in this environment.
 
 ---
 
