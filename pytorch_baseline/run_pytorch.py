@@ -17,10 +17,12 @@ if __name__ == "__main__":
     torch.cuda.synchronize()
 
     
-    t0 = time.time()
-    for _ in range(50):
-        with nvtx.annotate("Pytorch matmul", color="green"):
-            out = pytorch_batched_matmul(a, b)
-    torch.cuda.synchronize()
-    t1 = time.time()
+    with nvtx.annotate("LOOP: PyTorch matmul x50", color="green"):
+        t0 = time.time()
+        for _ in range(50):
+            with nvtx.annotate("KERNEL: PyTorch matmul", color="green"):
+                out = pytorch_batched_matmul(a, b)
+        torch.cuda.synchronize()
+        t1 = time.time()
     print(f"PyTorch batched matmul: {(t1 - t0) * 1000 / 50:.3f} ms per batch")
+
