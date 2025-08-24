@@ -137,7 +137,7 @@ python benchmark/run_all.py
 
 | Implementation                   | Avg Latency (ms per batch) | Speedup vs. Naive |
 | -------------------------------- | -------------------------- | ----------------- |
-| **PyTorch baseline (cuBLAS)**    | 0.080                      | 5.08×             |
+| **PyTorch baseline (cuBLAS)**    | 0.100                      | 4.06×             |
 | **CUDA kernel (naive)**          | 0.406                      | 1.00×             |
 | **CUDA kernel (tiled + shared)** | 0.244                      | 1.66×             |
 

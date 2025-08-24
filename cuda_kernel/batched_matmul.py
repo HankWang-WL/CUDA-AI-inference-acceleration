@@ -40,7 +40,7 @@ def batched_matmul_cupy_naive(a, b):
     kern_naive((blocks), (threads), (a, b, c, batch, M, K, N))
     return c
 
-# ===== 原本的 tiled：完全不改 =====
+# ===== 原本的 tiled =====
 def batched_matmul_cupy_tiled(a, b, tile=16):
     batch, M, K = a.shape
     _, _, N = b.shape
@@ -50,7 +50,7 @@ def batched_matmul_cupy_tiled(a, b, tile=16):
     kern_tiled((blocks), (threads), (a, b, c, batch, M, K, N))
     return c
 
-# ===== 新增的 O2 版本：TILE=32、每 thread 算兩個 col（x 維對半）=====
+# ===== O2 版本：TILE=32、float2、每 thread 算兩個 col（x 維對半）=====
 def batched_matmul_cupy_tiled_O2(a, b, tile=32):
     batch, M, K = a.shape
     _, _, N = b.shape
@@ -60,6 +60,7 @@ def batched_matmul_cupy_tiled_O2(a, b, tile=32):
     kern_tiled_O2((blocks), (threads), (a, b, c, batch, M, K, N))
     return c
 
+# ===== O2_1 版本：TILE=32、float4、每 thread 算四個 result（x,y 維對半）=====
 def batched_matmul_cupy_tiled_O2_1(a, b, tile=32):
     # 2x2 register blocking → threads=(tile/2, tile/2, 1)
     batch, M, K = a.shape

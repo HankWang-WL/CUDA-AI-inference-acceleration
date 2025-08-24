@@ -24,7 +24,7 @@ void batched_matmul_tiled_kernel_O2(
     const float* Bb = B + b * (K * N);
     float*       Cb = C + b * (M * N);
 
-    // +1 padding to avoid shared memory bank conflicts (preserves your original approach)
+    // +1 padding to avoid shared memory bank conflicts 
     __shared__ float As[TILE][TILE + 1];
     __shared__ float Bs[TILE][TILE + 1];
 
